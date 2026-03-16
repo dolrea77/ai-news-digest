@@ -1,0 +1,41 @@
+name: AI News Daily Digest
+
+on:
+  schedule:
+    - cron: '0 22 * * 0-4'    # UTC 22:00 = KST 07:00, 평일만
+  workflow_dispatch:             # 수동 실행
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            data/seen-urls.json
+            data/digest-history.json
+          key: digest-data-${{ github.run_id }}
+          restore-keys: digest-data-
+
+      - run: npm ci
+      - run: npm audit --audit-level=high
+        continue-on-error: true
+      - run: npm run build
+      - run: npm run digest
+        env:
+          AI_PROVIDER: ${{ vars.AI_PROVIDER || 'anthropic' }}
+          AI_MODEL: ${{ vars.AI_MODEL || 'claude-sonnet-4-6' }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ vars.AI_BASE_URL || '' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          IMPORTANCE_THRESHOLD: ${{ vars.IMPORTANCE_THRESHOLD || '3' }}
+          HISTORY_RETENTION_DAYS: ${{ vars.HISTORY_RETENTION_DAYS || '7' }}
+          DIGEST_LANGUAGE: ${{ vars.DIGEST_LANGUAGE || 'ko' }}

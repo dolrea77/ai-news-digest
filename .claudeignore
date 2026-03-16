@@ -1,0 +1,4 @@
+# .env 파일 접근 차단 — API 키, 웹훅 URL 등 민감 정보 보호
+.env
+.env.local
+.env.*.local
