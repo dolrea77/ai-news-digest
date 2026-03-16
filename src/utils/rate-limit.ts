@@ -1,16 +1,29 @@
 /**
- * Exponential backoff retry 로직
+ * 타임아웃 래퍼
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`타임아웃 (${ms}ms)`)), ms),
+    ),
+  ]);
+}
+
+/**
+ * Exponential backoff retry 로직 (개별 호출 타임아웃 포함)
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries = 3,
   baseDelayMs = 1000,
+  timeoutMs = 120000,
 ): Promise<T> {
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn();
+      return await withTimeout(fn(), timeoutMs);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
