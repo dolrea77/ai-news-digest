@@ -1,7 +1,25 @@
 import Parser from 'rss-parser';
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 import { NewsItem } from './types';
+import { stripMarkdown } from '../utils/markdown';
+
+// defuddle/node는 ESM-only — 동적 import 사용
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _defuddle: any = null;
+
+async function getDefuddle(): Promise<(input: string, url?: string, options?: Record<string, unknown>) => Promise<{
+  content: string;
+  contentMarkdown?: string;
+  title: string;
+  author: string;
+  published: string;
+}>> {
+  if (!_defuddle) {
+    const mod = await import('defuddle/node');
+    _defuddle = mod.Defuddle;
+  }
+  return _defuddle;
+}
 
 const RSS_FEEDS: Array<{ name: string; url: string }> = [
   { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml' },
@@ -32,14 +50,15 @@ async function fetchContent(url: string): Promise<string> {
     if (!contentType.includes('text/html') && !contentType.includes('application/xml')) {
       return '';
     }
-    const $ = cheerio.load(response.data);
-    $('script, style, nav, footer, header, aside').remove();
-    return $('article, main, .post-content, .entry-content, body')
-      .first()
-      .text()
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 10000);
+
+    const Defuddle = await getDefuddle();
+    const result = await Defuddle(response.data as string, url, { markdown: true });
+
+    const raw = result.contentMarkdown || result.content || '';
+    return (result.contentMarkdown
+      ? stripMarkdown(raw)
+      : raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    ).slice(0, 10000);
   } catch {
     return '';
   }

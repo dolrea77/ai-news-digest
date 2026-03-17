@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { NewsItem } from './types';
+import { stripMarkdown } from '../utils/markdown';
 
 // defuddle/node는 ESM-only — 동적 import 사용
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -8,6 +9,7 @@ let _defuddle: any = null;
 
 async function getDefuddle(): Promise<(input: string, url?: string, options?: Record<string, unknown>) => Promise<{
   content: string;
+  contentMarkdown?: string;
   title: string;
   author: string;
   published: string;
@@ -128,13 +130,14 @@ async function fetchArticleContent(url: string): Promise<ArticleExtraction> {
     }
 
     const Defuddle = await getDefuddle();
-    const result = await Defuddle(response.data as string, url);
+    const result = await Defuddle(response.data as string, url, { markdown: true });
 
-    const content = (result.content || '')
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 10000);
+    // Markdown 출력 우선 사용 → stripMarkdown으로 평문 변환
+    const raw = result.contentMarkdown || result.content || '';
+    const content = (result.contentMarkdown
+      ? stripMarkdown(raw)
+      : raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    ).slice(0, 10000);
 
     return {
       content,
