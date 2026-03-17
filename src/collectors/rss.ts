@@ -6,8 +6,8 @@ import { NewsItem } from './types';
 const RSS_FEEDS: Array<{ name: string; url: string }> = [
   { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml' },
   { name: 'Google AI Blog', url: 'https://blog.google/technology/ai/rss/' },
-  { name: 'Meta AI Blog', url: 'https://ai.meta.com/blog/rss/' },
-  { name: 'Anthropic Blog', url: 'https://www.anthropic.com/rss.xml' },
+  { name: 'Hugging Face Blog', url: 'https://huggingface.co/blog/feed.xml' },
+  { name: 'TechCrunch AI', url: 'https://techcrunch.com/category/artificial-intelligence/feed/' },
   { name: 'DeepMind Blog', url: 'https://deepmind.google/blog/rss.xml' },
   { name: 'Microsoft AI Blog', url: 'https://blogs.microsoft.com/ai/feed/' },
 ];

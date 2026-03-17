@@ -3,6 +3,7 @@ import { createAIProvider } from './analyzer/provider';
 import { collectRSS } from './collectors/rss';
 import { collectHackerNews } from './collectors/hackernews';
 import { collectHuggingFacePapers } from './collectors/huggingface';
+import { collectFromWebScraper } from './collectors/web-scraper';
 import { filterByUrlHistory } from './dedup/url-history';
 import { filterByDate } from './dedup/date-filter';
 import { groupBySimilarity } from './dedup/similarity-group';
@@ -27,14 +28,15 @@ async function main(): Promise<void> {
 
   // 2. 뉴스 수집 (모든 소스 병렬)
   console.log('\n--- Step 1: 뉴스 수집 ---');
-  const [rssItems, hnItems, hfItems] = await Promise.all([
+  const [rssItems, hnItems, hfItems, webItems] = await Promise.all([
     collectRSS(),
     collectHackerNews(),
     collectHuggingFacePapers(),
+    collectFromWebScraper(),
   ]);
 
-  let collected: NewsItem[] = [...rssItems, ...hnItems, ...hfItems];
-  console.log(`총 ${collected.length}건 수집 (RSS: ${rssItems.length}, HN: ${hnItems.length}, HF: ${hfItems.length})`);
+  let collected: NewsItem[] = [...rssItems, ...hnItems, ...hfItems, ...webItems];
+  console.log(`총 ${collected.length}건 수집 (RSS: ${rssItems.length}, HN: ${hnItems.length}, HF: ${hfItems.length}, Web: ${webItems.length})`);
 
   if (collected.length === 0) {
     console.log('수집된 뉴스가 없습니다. 종료합니다.');
