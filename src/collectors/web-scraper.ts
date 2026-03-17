@@ -2,6 +2,25 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { NewsItem } from './types';
 
+// defuddle/node는 ESM-only — 동적 import 사용
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _defuddle: any = null;
+
+async function getDefuddle(): Promise<(input: string, url?: string, options?: Record<string, unknown>) => Promise<{
+  content: string;
+  title: string;
+  author: string;
+  published: string;
+  description: string;
+  wordCount: number;
+}>> {
+  if (!_defuddle) {
+    const mod = await import('defuddle/node');
+    _defuddle = mod.Defuddle;
+  }
+  return _defuddle;
+}
+
 interface ScrapeSiteConfig {
   name: string;
   listUrl: string;
@@ -93,23 +112,38 @@ function parseDate(dateStr: string): string {
   return new Date().toISOString();
 }
 
-async function fetchArticleContent(url: string): Promise<string> {
+interface ArticleExtraction {
+  content: string;
+  title?: string;
+  author?: string;
+  publishedAt?: string;
+}
+
+async function fetchArticleContent(url: string): Promise<ArticleExtraction> {
   try {
     const response = await axios.get(url, AXIOS_CONFIG);
     const contentType = response.headers['content-type'] || '';
     if (!contentType.includes('text/html')) {
-      return '';
+      return { content: '' };
     }
-    const $ = cheerio.load(response.data);
-    $('script, style, nav, footer, header, aside, [role="navigation"]').remove();
-    return $('article, main, .post-content, .entry-content, [role="main"], body')
-      .first()
-      .text()
+
+    const Defuddle = await getDefuddle();
+    const result = await Defuddle(response.data as string, url);
+
+    const content = (result.content || '')
+      .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 10000);
+
+    return {
+      content,
+      title: result.title || undefined,
+      author: result.author || undefined,
+      publishedAt: result.published || undefined,
+    };
   } catch {
-    return '';
+    return { content: '' };
   }
 }
 
@@ -165,9 +199,22 @@ async function scrapeSite(config: ScrapeSiteConfig): Promise<NewsItem[]> {
       });
     }
 
-    // 본문 수집 (순차 — rate limit 고려)
+    // 본문 수집 (순차 — rate limit 고려) + defuddle 메타데이터 fallback
     for (const item of items) {
-      item.content = await fetchArticleContent(item.url);
+      const extraction = await fetchArticleContent(item.url);
+      item.content = extraction.content;
+      // defuddle 메타데이터로 제목/날짜 보완 (cheerio에서 못 가져왔을 때)
+      if (extraction.title && (!item.title || item.title.length < 5)) {
+        item.title = extraction.title;
+      }
+      if (extraction.publishedAt) {
+        const extractedDate = parseDate(extraction.publishedAt);
+        // 기존 날짜가 오늘(=파싱 실패 기본값)인 경우 defuddle 날짜로 대체
+        const today = new Date().toISOString().slice(0, 10);
+        if (item.publishedAt.startsWith(today)) {
+          item.publishedAt = extractedDate;
+        }
+      }
       // 소스 서버 부담 경감을 위한 딜레이
       await new Promise(resolve => setTimeout(resolve, 500));
     }
