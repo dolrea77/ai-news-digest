@@ -184,7 +184,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(error => {
+main().then(() => {
+  process.exit(0);
+}).catch(error => {
   console.error('실행 중 오류 발생:', error instanceof Error ? error.message : error);
   process.exit(1);
 });
